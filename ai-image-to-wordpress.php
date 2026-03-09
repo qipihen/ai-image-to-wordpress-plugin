@@ -3,7 +3,7 @@
  * Plugin Name: AI Image to WordPress
  * Plugin URI: https://github.com/qipihen/ai-image-to-wordpress-plugin
  * Description: Generate images with OpenRouter from the WordPress media area, optimize locally, apply SEO filename and readable alt text, then upload directly to Media Library.
- * Version: 0.2.0
+ * Version: 0.2.1
  * Author: qipihen
  * Author URI: https://github.com/qipihen
  * License: GPL-2.0+
@@ -19,7 +19,7 @@ final class AIWP_Image_Generator_Plugin
     private const OPTION_KEY = 'aiiwp_settings';
     private const NONCE_ACTION = 'aiiwp_generate_image';
     private const MENU_SLUG = 'aiiwp-generator';
-    private const VERSION = '0.2.0';
+    private const VERSION = '0.2.1';
 
     public function __construct()
     {
@@ -207,7 +207,14 @@ final class AIWP_Image_Generator_Plugin
                         <table class="form-table" role="presentation">
                             <tr>
                                 <th scope="row"><label for="aiiwp_prompt">Prompt</label></th>
-                                <td><textarea id="aiiwp_prompt" name="prompt" class="large-text" rows="4" required></textarea></td>
+                                <td><textarea id="aiiwp_prompt" name="prompt" class="large-text" rows="4"></textarea></td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><label for="aiiwp_prompt_list">Batch Prompts (optional)</label></th>
+                                <td>
+                                    <textarea id="aiiwp_prompt_list" name="prompt_list" class="large-text" rows="4" placeholder="One prompt per line"></textarea>
+                                    <p class="description">If provided, one line = one image task. This mode ignores Batch Count.</p>
+                                </td>
                             </tr>
                             <tr>
                                 <th scope="row"><label for="aiiwp_batch_count">Batch Count</label></th>
@@ -373,8 +380,10 @@ final class AIWP_Image_Generator_Plugin
         check_ajax_referer(self::NONCE_ACTION, 'nonce');
 
         $prompt = isset($_POST['prompt']) ? sanitize_textarea_field(wp_unslash($_POST['prompt'])) : '';
-        if ($prompt === '') {
-            wp_send_json_error(['message' => 'Prompt is required.'], 400);
+        $prompt_list_raw = isset($_POST['prompt_list']) ? sanitize_textarea_field(wp_unslash($_POST['prompt_list'])) : '';
+        $prompt_list = $this->parse_prompt_list($prompt_list_raw);
+        if ($prompt === '' && empty($prompt_list)) {
+            wp_send_json_error(['message' => 'Prompt is required (single prompt or batch prompt list).'], 400);
         }
 
         $settings = $this->get_settings();
@@ -390,8 +399,6 @@ final class AIWP_Image_Generator_Plugin
             ? sanitize_text_field(wp_unslash($_POST['model']))
             : $settings['model'];
         $batch_count = $this->sanitize_int_option($_POST['batch_count'] ?? 1, 1, 6, 1);
-        $cache_enabled_for_run = ((int) $settings['enable_cache'] === 1) && ($batch_count === 1);
-        $dedupe_enabled_for_run = ((int) $settings['enable_dedupe'] === 1) && ($batch_count === 1);
 
         $aspect_ratio = isset($_POST['aspect_ratio']) ? sanitize_text_field(wp_unslash($_POST['aspect_ratio'])) : '';
         if ($aspect_ratio !== '' && !preg_match('/^\d+(\.\d+)?:\d+(\.\d+)?$/', $aspect_ratio)) {
@@ -434,14 +441,45 @@ final class AIWP_Image_Generator_Plugin
 
         $site_brand = $this->get_site_brand();
         $generation_mode = $source_image_url !== '' ? 'image-to-image' : 'text-to-image';
-        $metadata = null;
+        $tasks = [];
+        if (!empty($prompt_list)) {
+            foreach ($prompt_list as $index => $line_prompt) {
+                $tasks[] = [
+                    'index' => $index + 1,
+                    'metadata_prompt' => $line_prompt,
+                    'generation_prompt' => $line_prompt,
+                ];
+            }
+        } else {
+            for ($variant_index = 1; $variant_index <= $batch_count; $variant_index++) {
+                $tasks[] = [
+                    'index' => $variant_index,
+                    'metadata_prompt' => $prompt,
+                    'generation_prompt' => $this->build_effective_prompt($prompt, $variant_index, $batch_count),
+                ];
+            }
+        }
+        if (empty($tasks)) {
+            wp_send_json_error(['message' => 'No valid prompt task found.'], 400);
+        }
+
+        $task_total = count($tasks);
+        $prompt_mode = !empty($prompt_list) ? 'multi-prompt' : ($task_total > 1 ? 'single-prompt-variants' : 'single-prompt');
+        $append_variant_suffix = ($prompt_mode === 'single-prompt-variants');
+        $force_generate_mode = $task_total > 1;
+        $cache_enabled_for_run = ((int) $settings['enable_cache'] === 1) && !$force_generate_mode;
+        $dedupe_enabled_for_run = ((int) $settings['enable_dedupe'] === 1) && !$force_generate_mode;
+
+        $metadata_by_prompt = [];
         $metadata_source = 'not-called';
         $results = [];
 
-        for ($variant_index = 1; $variant_index <= $batch_count; $variant_index++) {
-            $effective_prompt = $this->build_effective_prompt($prompt, $variant_index, $batch_count);
+        foreach ($tasks as $task) {
+            $task_index = (int) $task['index'];
+            $task_prompt = (string) $task['generation_prompt'];
+            $task_metadata_prompt = (string) $task['metadata_prompt'];
             $cache_key = $this->build_prompt_cache_key([
-                'prompt' => $effective_prompt,
+                'prompt' => $task_prompt,
                 'model' => $model,
                 'aspect_ratio' => $aspect_ratio,
                 'source_image_url' => $source_image_url,
@@ -466,7 +504,8 @@ final class AIWP_Image_Generator_Plugin
                         $cached_payload['reduction_percent'] = 0;
                         $cached_payload['dimension'] = 0;
                         $cached_payload['quality'] = 0;
-                        $cached_payload['variant'] = $variant_index;
+                        $cached_payload['variant'] = $task_index;
+                        $cached_payload['prompt_used'] = $task_metadata_prompt;
                         $results[] = $cached_payload;
                         continue;
                     }
@@ -474,7 +513,7 @@ final class AIWP_Image_Generator_Plugin
             }
 
             $image_result = $this->generate_image_from_openrouter(
-                $effective_prompt,
+                $task_prompt,
                 $api_key,
                 $model,
                 $aspect_ratio,
@@ -522,27 +561,36 @@ final class AIWP_Image_Generator_Plugin
                         $dedupe_payload['reduction_percent'] = $reduction;
                         $dedupe_payload['dimension'] = (int) $optimized['dimension'];
                         $dedupe_payload['quality'] = (int) $optimized['quality'];
-                        $dedupe_payload['variant'] = $variant_index;
+                        $dedupe_payload['variant'] = $task_index;
+                        $dedupe_payload['prompt_used'] = $task_metadata_prompt;
                         $results[] = $dedupe_payload;
                         continue;
                     }
                 }
             }
 
-            if (!is_array($metadata)) {
-                $metadata = $this->build_semantic_metadata(
-                    $prompt,
+            $metadata_key = md5($task_metadata_prompt . "\n" . $provided_alt);
+            if (!isset($metadata_by_prompt[$metadata_key])) {
+                $metadata_by_prompt[$metadata_key] = $this->build_semantic_metadata(
+                    $task_metadata_prompt,
                     $provided_alt,
                     $api_key,
                     (string) $settings['metadata_model'],
                     (int) $settings['enable_ai_metadata'] === 1
                 );
-                $metadata_source = (string) ($metadata['source'] ?? 'fallback');
+            }
+            $metadata = $metadata_by_prompt[$metadata_key];
+            $current_metadata_source = (string) ($metadata['source'] ?? 'fallback');
+            if ($metadata_source === 'not-called') {
+                $metadata_source = $current_metadata_source;
+            } elseif ($metadata_source !== 'ai-model' && $current_metadata_source === 'ai-model') {
+                $metadata_source = 'ai-model';
             }
 
-            $filename = $this->build_upload_filename($site_brand, $metadata['filename_keywords'], $variant_index, $batch_count);
-            $title = $this->build_upload_title($metadata['title'], $variant_index, $batch_count);
-            $alt_text = $this->generate_readable_alt($prompt, $metadata['alt']);
+            $variant_total = $append_variant_suffix ? $task_total : 1;
+            $filename = $this->build_upload_filename($site_brand, $metadata['filename_keywords'], $task_index, $variant_total);
+            $title = $this->build_upload_title($metadata['title'], $task_index, $variant_total);
+            $alt_text = $this->generate_readable_alt($task_metadata_prompt, $metadata['alt']);
 
             $upload = $this->upload_to_media_library($optimized['binary'], $filename, $alt_text, $title);
             if (is_wp_error($upload)) {
@@ -580,7 +628,8 @@ final class AIWP_Image_Generator_Plugin
                 'quality' => (int) $optimized['quality'],
                 'mode' => $generation_mode,
                 'status' => 'generated',
-                'variant' => $variant_index,
+                'variant' => $task_index,
+                'prompt_used' => $task_metadata_prompt,
             ];
         }
 
@@ -591,11 +640,12 @@ final class AIWP_Image_Generator_Plugin
         $primary = $results[0];
         $primary['items'] = $results;
         $primary['batch_count'] = count($results);
-        $primary['batch_mode'] = $batch_count > 1 ? 'force-generate' : 'normal';
+        $primary['batch_mode'] = $force_generate_mode ? 'force-generate' : 'normal';
+        $primary['prompt_mode'] = $prompt_mode;
         $primary['cache_enabled_for_run'] = $cache_enabled_for_run ? 1 : 0;
         $primary['dedupe_enabled_for_run'] = $dedupe_enabled_for_run ? 1 : 0;
         $primary['metadata_model'] = (string) $settings['metadata_model'];
-        $primary['metadata_source'] = is_array($metadata) ? $metadata_source : 'cache-or-dedupe-hit';
+        $primary['metadata_source'] = $metadata_source === 'not-called' ? 'cache-or-dedupe-hit' : $metadata_source;
         $primary['source_attachment_id'] = $source_attachment_id;
         $primary['source_image_url'] = $source_image_url;
 
@@ -721,6 +771,31 @@ final class AIWP_Image_Generator_Plugin
             return $fallback ? 1 : 0;
         }
         return (int) (!empty($value));
+    }
+
+    private function parse_prompt_list(string $input): array
+    {
+        if (trim($input) === '') {
+            return [];
+        }
+
+        $lines = preg_split('/\R/u', $input);
+        if (!is_array($lines)) {
+            return [];
+        }
+
+        $prompts = [];
+        foreach ($lines as $line) {
+            $clean = trim((string) $line);
+            if ($clean === '') {
+                continue;
+            }
+            $prompts[] = $clean;
+            if (count($prompts) >= 12) {
+                break;
+            }
+        }
+        return $prompts;
     }
 
     private function generate_image_from_openrouter(

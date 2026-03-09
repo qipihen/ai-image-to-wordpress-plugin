@@ -86,6 +86,7 @@
     var blocks = [
       "<strong>" + escapeHtml(AIWP_DATA.messages.success) + "</strong>",
       "<p><code>Batch: " + escapeHtml(String(items.length)) + "</code></p>",
+      "<p><code>Prompt mode: " + escapeHtml(data.prompt_mode || "single-prompt") + "</code></p>",
       "<p><code>Metadata source: " + escapeHtml(data.metadata_source || "fallback") + "</code></p>",
       "<p><code>Batch mode: " + escapeHtml(data.batch_mode || "normal") + "</code></p>"
     ];
@@ -107,6 +108,7 @@
         "<p><code>Filename: " + escapeHtml(item.filename || "") + "</code></p>",
         "<p><code>Title: " + escapeHtml(item.title || "") + "</code></p>",
         "<p><code>Alt: " + escapeHtml(item.alt_text || "") + "</code></p>",
+        "<p><code>Prompt: " + escapeHtml(item.prompt_used || "") + "</code></p>",
         sizeLine,
         "<p><button type=\"button\" class=\"button button-secondary aiiwp-copy-url\" data-url=\"" + escapeHtml(item.url) + "\">Copy URL</button></p>",
         "</div>"
@@ -130,8 +132,10 @@
       event.preventDefault();
 
       var payload = collectFormData($form);
-      if (!payload.prompt || !payload.prompt.trim()) {
-        showResult("Prompt is required.", "error");
+      var promptText = String(payload.prompt || "").trim();
+      var promptList = String(payload.prompt_list || "").trim();
+      if (!promptText && !promptList) {
+        showResult("Prompt is required (single prompt or batch prompt list).", "error");
         return;
       }
 
