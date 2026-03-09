@@ -86,7 +86,8 @@
     var blocks = [
       "<strong>" + escapeHtml(AIWP_DATA.messages.success) + "</strong>",
       "<p><code>Batch: " + escapeHtml(String(items.length)) + "</code></p>",
-      "<p><code>Metadata source: " + escapeHtml(data.metadata_source || "fallback") + "</code></p>"
+      "<p><code>Metadata source: " + escapeHtml(data.metadata_source || "fallback") + "</code></p>",
+      "<p><code>Batch mode: " + escapeHtml(data.batch_mode || "normal") + "</code></p>"
     ];
 
     items.forEach(function (item, index) {

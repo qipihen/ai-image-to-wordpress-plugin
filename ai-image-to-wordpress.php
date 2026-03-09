@@ -213,7 +213,7 @@ final class AIWP_Image_Generator_Plugin
                                 <th scope="row"><label for="aiiwp_batch_count">Batch Count</label></th>
                                 <td>
                                     <input id="aiiwp_batch_count" name="batch_count" type="number" min="1" max="6" value="1" />
-                                    <p class="description">Generate multiple variations in one run (1-6).</p>
+                                    <p class="description">Generate multiple new images in one run (1-6). In batch mode, cache/dedupe reuse is auto-disabled for this run.</p>
                                 </td>
                             </tr>
                             <tr>
@@ -390,6 +390,8 @@ final class AIWP_Image_Generator_Plugin
             ? sanitize_text_field(wp_unslash($_POST['model']))
             : $settings['model'];
         $batch_count = $this->sanitize_int_option($_POST['batch_count'] ?? 1, 1, 6, 1);
+        $cache_enabled_for_run = ((int) $settings['enable_cache'] === 1) && ($batch_count === 1);
+        $dedupe_enabled_for_run = ((int) $settings['enable_dedupe'] === 1) && ($batch_count === 1);
 
         $aspect_ratio = isset($_POST['aspect_ratio']) ? sanitize_text_field(wp_unslash($_POST['aspect_ratio'])) : '';
         if ($aspect_ratio !== '' && !preg_match('/^\d+(\.\d+)?:\d+(\.\d+)?$/', $aspect_ratio)) {
@@ -451,7 +453,7 @@ final class AIWP_Image_Generator_Plugin
                 'target_kb' => $target_kb,
             ]);
 
-            if ((int) $settings['enable_cache'] === 1) {
+            if ($cache_enabled_for_run) {
                 $cached_attachment_id = (int) get_transient($cache_key);
                 if ($cached_attachment_id > 0) {
                     $cached_payload = $this->get_attachment_payload($cached_attachment_id);
@@ -496,14 +498,14 @@ final class AIWP_Image_Generator_Plugin
 
             $hashes = $this->build_image_hashes($optimized['binary']);
 
-            if ((int) $settings['enable_dedupe'] === 1 && $hashes['exact'] !== '') {
+            if ($dedupe_enabled_for_run && $hashes['exact'] !== '') {
                 $similar_attachment_id = $this->find_similar_attachment_id(
                     $hashes['exact'],
                     $hashes['ahash'],
                     (int) $settings['dedupe_distance']
                 );
                 if ($similar_attachment_id > 0) {
-                    if ((int) $settings['enable_cache'] === 1) {
+                    if ($cache_enabled_for_run) {
                         set_transient($cache_key, $similar_attachment_id, 30 * DAY_IN_SECONDS);
                     }
                     $dedupe_payload = $this->get_attachment_payload($similar_attachment_id);
@@ -555,7 +557,7 @@ final class AIWP_Image_Generator_Plugin
             }
             update_post_meta((int) $upload['attachment_id'], '_aiiwp_prompt_cache_key', $cache_key);
 
-            if ((int) $settings['enable_cache'] === 1) {
+            if ($cache_enabled_for_run) {
                 set_transient($cache_key, (int) $upload['attachment_id'], 30 * DAY_IN_SECONDS);
             }
 
@@ -589,6 +591,9 @@ final class AIWP_Image_Generator_Plugin
         $primary = $results[0];
         $primary['items'] = $results;
         $primary['batch_count'] = count($results);
+        $primary['batch_mode'] = $batch_count > 1 ? 'force-generate' : 'normal';
+        $primary['cache_enabled_for_run'] = $cache_enabled_for_run ? 1 : 0;
+        $primary['dedupe_enabled_for_run'] = $dedupe_enabled_for_run ? 1 : 0;
         $primary['metadata_model'] = (string) $settings['metadata_model'];
         $primary['metadata_source'] = is_array($metadata) ? $metadata_source : 'cache-or-dedupe-hit';
         $primary['source_attachment_id'] = $source_attachment_id;

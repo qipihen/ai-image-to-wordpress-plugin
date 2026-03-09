@@ -20,7 +20,7 @@ WordPress AI 生图插件、OpenRouter WordPress 插件、Gemini 生图、图片
   - JPEG 质量循环压缩
 - 提示词缓存（同参数命中时复用已有媒体，节省 API）
 - 相似图片去重（感知哈希，上传前拦截重复图）
-- 批量生图（一次 1-6 张变体）
+- 批量生图（一次 1-6 张新图；该次任务自动关闭缓存/去重复用）
 - SEO 文件名：`{brand}-{keywords}.jpg`（不强制时间戳）
 - Alt/Title 通过 AI 元数据改写（失败自动回退）
 - 上传到媒体库并返回 URL + 附件 ID
