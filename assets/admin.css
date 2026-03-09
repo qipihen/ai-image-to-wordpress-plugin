@@ -1,0 +1,72 @@
+.aiiwp-wrap .aiiwp-grid {
+  display: grid;
+  grid-template-columns: minmax(600px, 1.3fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.aiiwp-card {
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.aiiwp-card h2 {
+  margin-top: 0;
+}
+
+.aiiwp-card details {
+  margin-top: 12px;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.aiiwp-card details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.aiiwp-result {
+  margin-top: 16px;
+  border-left: 4px solid #72aee6;
+  background: #f0f6fc;
+  padding: 12px;
+}
+
+.aiiwp-result.aiiwp-status-success {
+  border-left-color: #00a32a;
+  background: #f0fdf4;
+}
+
+.aiiwp-result.aiiwp-status-error {
+  border-left-color: #d63638;
+  background: #fff1f0;
+}
+
+.aiiwp-result p {
+  margin: 8px 0;
+}
+
+.aiiwp-source-preview {
+  margin-top: 10px;
+}
+
+.aiiwp-source-preview.is-hidden {
+  display: none;
+}
+
+.aiiwp-source-preview img {
+  max-width: 240px;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+  border: 1px solid #dcdcde;
+}
+
+@media (max-width: 1180px) {
+  .aiiwp-wrap .aiiwp-grid {
+    grid-template-columns: 1fr;
+  }
+}
