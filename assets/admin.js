@@ -122,6 +122,141 @@
     return blocks.join("");
   }
 
+  function parseCsvRows(text) {
+    var input = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    var rows = [];
+    var row = [];
+    var cell = "";
+    var inQuotes = false;
+
+    for (var i = 0; i < input.length; i++) {
+      var ch = input.charAt(i);
+      var next = input.charAt(i + 1);
+
+      if (inQuotes) {
+        if (ch === "\"") {
+          if (next === "\"") {
+            cell += "\"";
+            i += 1;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          cell += ch;
+        }
+        continue;
+      }
+
+      if (ch === "\"") {
+        inQuotes = true;
+      } else if (ch === ",") {
+        row.push(cell);
+        cell = "";
+      } else if (ch === "\n") {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = "";
+      } else {
+        cell += ch;
+      }
+    }
+
+    row.push(cell);
+    rows.push(row);
+
+    return rows;
+  }
+
+  function normalizePromptCell(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function extractPromptsFromCsv(text, maxCount) {
+    var rows = parseCsvRows(text);
+    var prompts = [];
+    var headerPromptIndex = -1;
+    var startIndex = 0;
+    var headerKeys = { prompt: true, prompt_text: true, text: true, content: true };
+
+    if (rows.length > 0) {
+      var first = rows[0].map(function (col) {
+        return normalizePromptCell(col).toLowerCase();
+      });
+      for (var i = 0; i < first.length; i++) {
+        if (headerKeys[first[i]]) {
+          headerPromptIndex = i;
+          startIndex = 1;
+          break;
+        }
+      }
+    }
+
+    for (var r = startIndex; r < rows.length; r++) {
+      var cols = rows[r] || [];
+      var prompt = "";
+      if (headerPromptIndex >= 0 && headerPromptIndex < cols.length) {
+        prompt = normalizePromptCell(cols[headerPromptIndex]);
+      } else {
+        for (var c = 0; c < cols.length; c++) {
+          var candidate = normalizePromptCell(cols[c]);
+          if (candidate) {
+            prompt = candidate;
+            break;
+          }
+        }
+      }
+      if (!prompt) {
+        continue;
+      }
+      prompts.push(prompt);
+      if (prompts.length >= maxCount) {
+        break;
+      }
+    }
+
+    return prompts;
+  }
+
+  function bindPromptCsvImport() {
+    var $btn = $("#aiiwp-import-prompts-csv");
+    var $file = $("#aiiwp_prompt_csv_file");
+    var $list = $("#aiiwp_prompt_list");
+    if (!$btn.length || !$file.length || !$list.length) {
+      return;
+    }
+
+    $btn.on("click", function (event) {
+      event.preventDefault();
+      $file.trigger("click");
+    });
+
+    $file.on("change", function () {
+      var file = this.files && this.files[0];
+      if (!file) {
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function () {
+        var text = String(reader.result || "");
+        var prompts = extractPromptsFromCsv(text, 12);
+        if (!prompts.length) {
+          showResult("CSV parsed, but no valid prompt rows were found.", "error");
+          return;
+        }
+        $list.val(prompts.join("\n"));
+        showResult("Loaded " + escapeHtml(String(prompts.length)) + " prompts from CSV.", "info");
+      };
+      reader.onerror = function () {
+        showResult("Failed to read CSV file.", "error");
+      };
+      reader.readAsText(file);
+    });
+  }
+
   function bindGeneratorForm() {
     var $form = $("#aiiwp-generate-form");
     if (!$form.length) {
@@ -281,6 +416,7 @@
   $(function () {
     insertMediaLibraryButton();
     bindGeneratorForm();
+    bindPromptCsvImport();
     bindSourceUrlInput();
     bindSourcePicker();
   });

@@ -3,7 +3,7 @@
  * Plugin Name: AI Image to WordPress
  * Plugin URI: https://github.com/qipihen/ai-image-to-wordpress-plugin
  * Description: Generate images with OpenRouter from the WordPress media area, optimize locally, apply SEO filename and readable alt text, then upload directly to Media Library.
- * Version: 0.2.1
+ * Version: 0.2.2
  * Author: qipihen
  * Author URI: https://github.com/qipihen
  * License: GPL-2.0+
@@ -19,7 +19,7 @@ final class AIWP_Image_Generator_Plugin
     private const OPTION_KEY = 'aiiwp_settings';
     private const NONCE_ACTION = 'aiiwp_generate_image';
     private const MENU_SLUG = 'aiiwp-generator';
-    private const VERSION = '0.2.1';
+    private const VERSION = '0.2.2';
 
     public function __construct()
     {
@@ -213,7 +213,11 @@ final class AIWP_Image_Generator_Plugin
                                 <th scope="row"><label for="aiiwp_prompt_list">Batch Prompts (optional)</label></th>
                                 <td>
                                     <textarea id="aiiwp_prompt_list" name="prompt_list" class="large-text" rows="4" placeholder="One prompt per line"></textarea>
-                                    <p class="description">If provided, one line = one image task. This mode ignores Batch Count.</p>
+                                    <p>
+                                        <button type="button" class="button" id="aiiwp-import-prompts-csv">Import Prompts CSV</button>
+                                        <input type="file" id="aiiwp_prompt_csv_file" accept=".csv,text/csv" style="display:none;" />
+                                    </p>
+                                    <p class="description">If provided, one line = one image task. This mode ignores Batch Count. CSV import supports one prompt per row (or a column named <code>prompt</code>).</p>
                                 </td>
                             </tr>
                             <tr>

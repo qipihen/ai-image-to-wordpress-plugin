@@ -22,6 +22,7 @@ WordPress AI 生图插件、OpenRouter WordPress 插件、Gemini 生图、图片
 - 相似图片去重（感知哈希，上传前拦截重复图）
 - 批量生图（一次 1-6 张新图；该次任务自动关闭缓存/去重复用）
 - 多 Prompt 批量模式（每行一个 prompt，每行生成一张图）
+- CSV Prompt 导入（按行导入到 Batch Prompts）
 - SEO 文件名：`{brand}-{keywords}.jpg`（不强制时间戳）
 - Alt/Title 通过 AI 元数据改写（失败自动回退）
 - 上传到媒体库并返回 URL + 附件 ID
@@ -45,7 +46,7 @@ WordPress AI 生图插件、OpenRouter WordPress 插件、Gemini 生图、图片
 
 1. 输入提示词。
 2. 可选：从媒体库选择源图，或粘贴外部图片 URL 做图生图。
-3. 如需多个 prompt，在 `Batch Prompts` 每行填一个 prompt（会覆盖 Batch Count）。
+3. 如需多个 prompt，可在 `Batch Prompts` 每行填一个，或点击 `Import Prompts CSV` 导入（会覆盖 Batch Count）。
 4. 如是单 prompt 多变体，则使用 `Batch Count`（1-6）。
 5. 选择使用场景：`content`、`featured`、`hero`。
 6. 点击 **Generate and Upload**。
