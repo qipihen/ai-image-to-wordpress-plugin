@@ -11,14 +11,18 @@ WordPress AI 生图插件、OpenRouter WordPress 插件、Gemini 生图、图片
 ## 核心功能
 
 - 在 WordPress 后台直接输入提示词生成图片
-- 支持图生图（可选择媒体库已有图片作为源图）
+- 支持图生图（可选择媒体库图片或外部图片 URL 作为源图）
 - 支持 OpenRouter 模型（默认 `google/gemini-3.1-flash-image-preview`）
+- 支持低成本元数据小模型，自动生成更自然的文件名/标题/Alt（默认 `google/gemini-2.5-flash-lite-preview-09-2025`）
 - 上传前本地优化：
   - 目标体积（KB）
   - 最大宽度与最小宽度下限
   - JPEG 质量循环压缩
-- SEO 文件名：`{site}-{keywords}-{timestamp}.jpg`
-- Alt 文本自动生成（或手动覆盖）
+- 提示词缓存（同参数命中时复用已有媒体，节省 API）
+- 相似图片去重（感知哈希，上传前拦截重复图）
+- 批量生图（一次 1-6 张变体）
+- SEO 文件名：`{brand}-{keywords}.jpg`（不强制时间戳）
+- Alt/Title 通过 AI 元数据改写（失败自动回退）
 - 上传到媒体库并返回 URL + 附件 ID
 - 多入口可用：
   - `媒体 -> AI Generate`
@@ -39,10 +43,11 @@ WordPress AI 生图插件、OpenRouter WordPress 插件、Gemini 生图、图片
 ## 快速使用
 
 1. 输入提示词。
-2. 可选：选择源图进行图生图。
-3. 选择使用场景：`content`、`featured`、`hero`。
-4. 点击 **Generate and Upload**。
-5. 复制返回 URL，用于文章、页面或特色图。
+2. 可选：从媒体库选择源图，或粘贴外部图片 URL 做图生图。
+3. 可选：设置批量数量（1-6）。
+4. 选择使用场景：`content`、`featured`、`hero`。
+5. 点击 **Generate and Upload**。
+6. 复制返回 URL（可多条），用于文章、页面或特色图。
 
 ## 兼容性
 
