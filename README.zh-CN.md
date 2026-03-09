@@ -64,10 +64,6 @@ node -e "new Function(require('fs').readFileSync('assets/admin.js','utf8'))"
 - 请使用 HTTPS，并确保后台权限安全。
 - 保持 WordPress 与插件更新。
 
-## 作者
-
-- GitHub: [qipihen](https://github.com/qipihen)
-
 ## 许可证
 
 GPL-2.0+

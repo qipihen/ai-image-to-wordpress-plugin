@@ -64,10 +64,6 @@ node -e "new Function(require('fs').readFileSync('assets/admin.js','utf8'))"
 - Use HTTPS and strong admin access controls.
 - Keep plugin and WordPress updated.
 
-## Author
-
-- GitHub: [qipihen](https://github.com/qipihen)
-
 ## License
 
 GPL-2.0+
